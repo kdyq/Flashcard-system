@@ -1,0 +1,7 @@
+What is the capital of France?	<b>Paris</b>
+Mitochondria is the powerhouse of the cell	Mitochondria generate most of the chemical energy needed to power the cell's biochemical reactions.<div><br></div><div>Chemical energy is stored as <b>ATP</b>.</div>
+中文卡片:中国的首都是哪里	<div><b>北京</b>,中国的政治与文化中心</div>
+LaTeX test: quadratic formula	$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$
+HTML entity test: Tom &amp; Jerry &nbsp; (nbsp after Jerry)	Tom and Jerry is a classic animation.<br>Created in 1940.
+多字段混合:超文本传输协议的缩写是	HTTP(HyperText Transfer Protocol)<br><br>注意:HTTPS 是其加密版本
+Anki basic card with newline in answer	Line one of the answer<br>Line two of the answer

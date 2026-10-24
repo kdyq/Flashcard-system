@@ -1,0 +1,42 @@
+{
+  "format": "fanfan-export",
+  "version": 1,
+  "exported_at": "2026-10-24T08:00:00.000Z",
+  "settings": {
+    "daily_new_limit": 20,
+    "daily_review_limit": 200,
+    "fsrs_params": null
+  },
+  "decks": [
+    { "id": 1, "name": "导入测试卡组", "parent_id": null, "sort_order": 0, "created_at": "2026-10-24T08:00:00.000Z" },
+    { "id": 2, "name": "子卡组", "parent_id": 1, "sort_order": 0, "created_at": "2026-10-24T08:00:00.000Z" }
+  ],
+  "cards": [
+    {
+      "id": 1, "deck_id": 1, "note_id": null, "type": "basic",
+      "front_md": "JSON 导入的新卡(未学过)", "back_md": "state 应为 new",
+      "due": "2026-10-24T08:00:00.000Z", "stability": null, "difficulty": null,
+      "state": "new", "reps": 0, "lapses": 0, "last_review": null,
+      "elapsed_days": 0, "scheduled_days": 0, "suspended": 0, "buried_until": null,
+      "created_at": "2026-10-24T08:00:00.000Z", "updated_at": "2026-10-24T08:00:00.000Z"
+    },
+    {
+      "id": 2, "deck_id": 2, "note_id": null, "type": "basic",
+      "front_md": "JSON 导入的复习中卡(带 FSRS 状态)", "back_md": "state 应为 review,due 应还原",
+      "due": "2026-10-28T08:00:00.000Z", "stability": 3.5, "difficulty": 5.2,
+      "state": "review", "reps": 4, "lapses": 1, "last_review": "2026-10-24T08:00:00.000Z",
+      "elapsed_days": 0, "scheduled_days": 3, "suspended": 0, "buried_until": null,
+      "created_at": "2026-10-20T08:00:00.000Z", "updated_at": "2026-10-24T08:00:00.000Z"
+    }
+  ],
+  "review_logs": [
+    { "id": 1, "card_id": 2, "rating": 3, "state_before": "learning", "stability_before": 0.5, "stability_after": 3.5, "difficulty_after": 5.2, "due_after": "2026-10-28T08:00:00.000Z", "elapsed_days": 0, "scheduled_days": 3, "review_time": "2026-10-24T08:00:00.000Z", "day_key": "2026-10-24" }
+  ],
+  "tags": [
+    { "id": 1, "name": "导入测试" }
+  ],
+  "card_tags": [
+    { "card_id": 1, "tag_id": 1 },
+    { "card_id": 2, "tag_id": 1 }
+  ]
+}

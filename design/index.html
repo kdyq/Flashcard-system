@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>闪卡系统 · 前端设计稿选择</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f8f9;--surface:#fff;--ink:#1a1d21;--muted:#6b7280;
+    --hairline:#e5e7eb;--accent:#1d4ed8;--accent-soft:#eff4ff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:"Space Grotesk","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;padding:60px 24px;
+  }
+  .wrap{max-width:860px;margin:0 auto}
+  .kicker{font-size:12px;letter-spacing:.18em;color:var(--muted);font-weight:500}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:8px 0 6px}
+  .lead{color:var(--muted);font-size:15px;max-width:62ch}
+  .tips{
+    margin:26px 0 34px;background:var(--surface);border:1px solid var(--hairline);
+    border-radius:12px;padding:16px 20px;font-size:13.5px;color:var(--muted);
+  }
+  .tips b{color:var(--ink);font-weight:600}
+  .opt{
+    display:flex;align-items:center;gap:22px;background:var(--surface);
+    border:1px solid var(--hairline);border-radius:14px;padding:24px 26px;
+    margin-bottom:16px;transition:transform .15s ease,box-shadow .15s ease;text-decoration:none;color:inherit;
+  }
+  .opt:hover{transform:translateY(-2px);box-shadow:0 10px 30px -14px rgba(15,23,42,.18)}
+  .swatch{width:64px;height:64px;border-radius:14px;flex:none;display:grid;place-items:center;font-size:26px;color:#fff;font-weight:700}
+  .opt h2{font-size:18px;font-weight:700}
+  .opt .desc{font-size:13.5px;color:var(--muted);margin-top:2px}
+  .open{
+    margin-left:auto;flex:none;font-size:13.5px;font-weight:600;color:var(--accent);
+    background:var(--accent-soft);padding:9px 18px;border-radius:999px;display:inline-flex;gap:6px;align-items:center;
+  }
+  .foot{margin-top:30px;font-size:12.5px;color:var(--muted)}
+  @media (max-width:640px){.opt{flex-wrap:wrap}.open{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">FLASHCARD SYSTEM / UI DESIGN</div>
+  <h1>三套前端设计方向</h1>
+  <p class="lead">同样的功能（仪表盘 + 学习界面），三种视觉气质。请在浏览器中实际把玩后再选择，也可以混搭，比如「A 的布局 + C 的配色」。</p>
+
+  <div class="tips">
+    <b>每套都是可交互演示</b>：顶部导航可切换「仪表盘 / 开始学习」；学习页支持点卡片或按空格翻面，按 1-4 评分（会落章 / 切卡），Z 撤销。示例卡循环 4 张。
+  </div>
+
+  <a class="opt" href="./a-evergreen.html" target="_blank">
+    <span class="swatch" style="background:linear-gradient(135deg,#047857,#10b981)">A</span>
+    <span>
+      <h2>A · 常青 Evergreen</h2>
+      <div class="desc">清新学院风。侧边栏布局，翡翠绿主色，柔和圆角与阴影，进度环 + 热力图 + 负荷预测。最像一款现代学习应用。</div>
+    </span>
+    <span class="open">打开演示 <i class="ph ph-arrow-up-right"></i></span>
+  </a>
+
+  <a class="opt" href="./b-fanfan.html" target="_blank">
+    <span class="swatch" style="background:linear-gradient(135deg,#a93123,#d94f3d)">B</span>
+    <span>
+      <h2>B · 翻翻 FanFan</h2>
+      <div class="desc">实体索引卡隐喻。手写体点缀，朱红印章元素，卡片堆叠、翻牌落章的物理动效。最有把玩感、最不像「生成的东西」。</div>
+    </span>
+    <span class="open">打开演示 <i class="ph ph-arrow-up-right"></i></span>
+  </a>
+
+  <a class="opt" href="./c-niannian.html" target="_blank">
+    <span class="swatch" style="background:linear-gradient(135deg,#1e3a8a,#2563eb)">C</span>
+    <span>
+      <h2>C · 念念 NianNian</h2>
+      <div class="desc">极简专注风。大留白、细线分隔、等宽数字、电光蓝单色点缀，动效快而克制。为长时间专注复习设计，最耐看。</div>
+    </span>
+    <span class="open">打开演示 <i class="ph ph-arrow-up-right"></i></span>
+  </a>
+
+  <div class="foot">三套均为浅色主题（按要求不做暗色）。技术栈预告：React + TypeScript + GSAP + Tailwind，正式开发时按所选方向落地。</div>
+</div>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+</body>
+</html>
