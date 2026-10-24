@@ -15,7 +15,8 @@ export interface CardItem {
   suspended: number; buried_until: string | null;
   tts: number; audio_url: string | null; audio_mode: string | null;
   created_at: string; updated_at: string;
-  tags?: string[]; deckName?: string; kind?: string;
+  tags?: string[]; deckName?: string; kind?: string; clozeIndex?: number | null;
+  siblingId?: number | null;
   previews?: Record<'1' | '2' | '3' | '4', string>;
   logs?: ReviewLogItem[];
 }

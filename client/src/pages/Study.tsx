@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { gsap } from 'gsap';
-import { ArrowCounterClockwise, X, HandTap, CheckFat, ArrowLeft } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, X, HandTap, CheckFat, ArrowLeft, Pause, PencilSimple, EyeSlash } from '@phosphor-icons/react';
 import { api } from '../api';
 import type { CardItem } from '../types';
 import MarkdownView from '../components/MarkdownView';
+import ClozeContent from '../components/ClozeContent';
+import CardEditor from '../components/CardEditor';
 import { useToast } from '../components/Toast';
 import useShortcuts from '../hooks/useShortcuts';
 import { D, RM, RATING_LABELS } from '../utils/anim';
@@ -26,6 +28,7 @@ export default function Study() {
   const [nonce, setNonce] = useState(0); // 触发重入动画(撤销/重载)
   const [doneStats, setDoneStats] = useState({ review: 0, news: 0 });
   const [pendingNote, setPendingNote] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const completedRef = useRef(0);
   const flippedRef = useRef(false);
@@ -130,7 +133,7 @@ export default function Study() {
     if (!cur || !flippedRef.current || busyRef.current || finished) return;
     busyRef.current = true;
     try {
-      const res = await api.study.review(cur.id, r);
+      const res = await api.study.review(cur.id, r, cur.clozeIndex ?? undefined);
       undoStackRef.current.push({ cardId: cur.id, logId: res.logId, kind: cur.kind ?? 'review' });
       completedRef.current += 1;
       setDoneStats(s => cur.kind === 'new'
@@ -192,8 +195,65 @@ export default function Study() {
   useShortcuts({
     onSpace: () => { if (!finished) flip(); },
     onDigit: n => rate(n),
-    onKey: k => { if (k === 'z') undo(); if (k === 'escape') navigate('/'); },
+    onKey: k => {
+      if (k === 'z') undo();
+      if (k === 'escape') navigate('/');
+      if (k === 'e') editCurrent();
+      if (k === '@') suspendCurrent();
+    },
   }, !loading);
+
+  /* E:编辑当前卡(双向卡自动联动另一张) */
+  const editCurrent = () => {
+    if (!cur || finished) return;
+    setEditorOpen(true);
+  };
+  const onEditorSaved = async () => {
+    setEditorOpen(false);
+    if (!cur) return;
+    try {
+      const fresh = await api.cards.get(cur.id);
+      setQueue(q => q.map((c, idx) => idx === i ? { ...c, ...fresh } : c));
+      toast('卡片已更新');
+    } catch { /* 保留旧内容 */ }
+  };
+
+  /* @ / 按钮:暂停或搁置当前卡并跳过 */
+  const skipCurrent = useCallback((note: string) => {
+    const tl = gsap.timeline();
+    tl.to(cardRef.current, { x: -480, rotation: -10, autoAlpha: 0, duration: D(0.45), ease: 'power2.in' })
+      .add(() => {
+        flippedRef.current = false;
+        setFlipped(false);
+        advance(queue, i + 1);
+      });
+    toast(note);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, i]);
+
+  const suspendCurrent = useCallback(async () => {
+    if (!cur || busyRef.current || finished) return;
+    busyRef.current = true;
+    try {
+      await api.study.suspend(cur.id);
+      skipCurrent('已暂停,可在浏览器中恢复');
+    } catch (e: any) {
+      toast(e.message);
+      busyRef.current = false;
+    }
+  }, [cur, finished, skipCurrent, toast]);
+
+  const buryCurrent = useCallback(async () => {
+    if (!cur || busyRef.current || finished) return;
+    busyRef.current = true;
+    try {
+      await api.study.bury(cur.id);
+      skipCurrent('已搁置到明天');
+    } catch (e: any) {
+      toast(e.message);
+      busyRef.current = false;
+    }
+  }, [cur, finished, skipCurrent, toast]);
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--muted)' }}>正在洗牌…</div>;
@@ -208,6 +268,9 @@ export default function Study() {
         </span>
         <div className="study-acts">
           <button className="icon-btn" onClick={undo} title="撤销上次评分(Z)"><ArrowCounterClockwise size={17} /></button>
+          <button className="icon-btn" onClick={() => editCurrent()} disabled={!cur || finished} title="编辑当前卡(E)"><PencilSimple size={17} /></button>
+          <button className="icon-btn" onClick={buryCurrent} disabled={!cur || finished} title="搁置到明天"><EyeSlash size={17} /></button>
+          <button className="icon-btn" onClick={suspendCurrent} disabled={!cur || finished} title="暂停(@)"><Pause size={17} /></button>
           <button className="icon-btn" onClick={() => navigate('/')} title="结束学习(Esc)"><X size={17} /></button>
         </div>
       </div>
@@ -234,7 +297,18 @@ export default function Study() {
                   <span className="tag plain">{cur.deckName}</span>
                 </div>
                 <div className={flipped ? 'card-a' : 'card-q'} key={`${cur.id}-${flipped}`}>
-                  <MarkdownView md={flipped ? (cur.back_md ?? '(没有背面内容)') : cur.front_md} />
+                  {cur.type === 'cloze' ? (
+                    <>
+                      <ClozeContent md={cur.front_md} activeIndex={cur.clozeIndex ?? null} revealed={flipped} />
+                      {flipped && cur.back_md && (
+                        <div style={{ marginTop: 14, borderTop: '1px dashed var(--hairline)', paddingTop: 12 }}>
+                          <MarkdownView md={cur.back_md} />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <MarkdownView md={flipped ? (cur.back_md ?? '(没有背面内容)') : cur.front_md} />
+                  )}
                 </div>
                 {!flipped && (
                   <div className="card-hint"><HandTap size={17} />点一下卡片,或按 <kbd>空格</kbd> 翻面</div>
@@ -260,10 +334,16 @@ export default function Study() {
             <span><kbd>空格</kbd> 翻面</span>
             <span><kbd>1</kbd>-<kbd>4</kbd> 评分</span>
             <span><kbd>Z</kbd> 撤销</span>
+            <span><kbd>E</kbd> 编辑</span>
+            <span><kbd>@</kbd> 暂停</span>
             <span><kbd>Esc</kbd> 退出</span>
           </div>
         )}
       </div>
+
+      {editorOpen && cur && (
+        <CardEditor payload={{ card: cur }} onClose={() => setEditorOpen(false)} onSaved={onEditorSaved} />
+      )}
     </div>
   );
 }

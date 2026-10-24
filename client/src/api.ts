@@ -36,6 +36,9 @@ export const api = {
       req<{ items: CardItem[]; count: number }>('POST', '/cards', Array.isArray(cards) ? { cards } : cards),
     update: (id: number, patch: Partial<CardItem>) => req<CardItem>('PATCH', `/cards/${id}`, patch),
     remove: (id: number) => req<{ ok: boolean }>('DELETE', `/cards/${id}`),
+    reset: (id: number) => req<{ ok: boolean }>('POST', `/cards/${id}/reset`, {}),
+    batch: (ids: number[], action: string, extra?: Record<string, unknown>) =>
+      req<{ ok: boolean; action: string; affected: number }>('POST', '/cards/batch', { ids, action, ...extra }),
     tags: () => req<{ items: TagItem[] }>('GET', '/cards/tags'),
   },
   study: {
@@ -44,6 +47,9 @@ export const api = {
     review: (cardId: number, rating: 1 | 2 | 3 | 4, clozeIndex?: number) =>
       req<ReviewResult>('POST', '/study/review', { cardId, rating, clozeIndex }),
     undo: (logId?: number) => req<{ ok: boolean; cardId: number }>('POST', '/study/undo', logId ? { logId } : {}),
+    suspend: (cardId: number, suspended?: boolean) =>
+      req<{ ok: boolean; suspended: boolean }>('POST', '/study/suspend', { cardId, suspended }),
+    bury: (cardId: number) => req<{ ok: boolean }>('POST', '/study/bury', { cardId }),
   },
   stats: {
     dashboard: () => req<DashboardStats>('GET', '/stats/dashboard'),

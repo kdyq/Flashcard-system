@@ -18,6 +18,13 @@ function todayCounts(): { newDone: number; reviewDone: number } {
 
 const notBlocked = 'suspended = 0 AND (buried_until IS NULL OR buried_until <= ?)';
 
+/** 解析填空卡的挖空序号(c1/c2/c3…),按序返回 */
+export function clozeIndexes(frontMd: string): number[] {
+  const set = new Set<number>();
+  for (const m of frontMd.matchAll(/\{\{c(\d+)::[\s\S]*?\}\}/g)) set.add(Number(m[1]));
+  return [...set].sort((a, b) => a - b);
+}
+
 function deckFilterSQL(deckId?: number | null): { sql: string; params: any[] } {
   const ids = deckId ? subtreeDeckIds(Number(deckId)) : null;
   if (ids && ids.length) return { sql: `deck_id IN (${ids.map(() => '?').join(',')})`, params: ids };
@@ -40,7 +47,13 @@ router.get('/queue', (req, res) => {
     const tags = db.prepare('SELECT t.name FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = ? ORDER BY t.name')
       .all(c.id).map((r: any) => r.name);
     const deckName = (db.prepare('SELECT name FROM decks WHERE id = ?').get(c.deck_id) as any)?.name ?? '';
-    return { ...c, tags, deckName, kind, previews: previewIntervals(c, now) };
+    // 填空卡:同一次到期只出一个挖空项,按复习次数轮换(c1 → c2 → …)
+    let clozeIndex: number | null = null;
+    if (c.type === 'cloze') {
+      const idxs = clozeIndexes(c.front_md);
+      if (idxs.length) clozeIndex = idxs[c.reps % idxs.length];
+    }
+    return { ...c, tags, deckName, kind, clozeIndex, previews: previewIntervals(c, now) };
   });
 
   // 1. 学习中卡片(learning/relearning,due 在今日内)——最高优先插队
@@ -164,6 +177,25 @@ router.post('/undo', (req, res) => {
   tx();
   const restored = db.prepare('SELECT * FROM cards WHERE id = ?').get(log.card_id) as CardRow;
   res.json({ ok: true, cardId: log.card_id, state: restored.state, due: restored.due });
+});
+
+/** 暂停/恢复当前卡(P1) */
+router.post('/suspend', (req, res) => {
+  const { cardId, suspended } = req.body ?? {};
+  const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(Number(cardId)) as CardRow | undefined;
+  if (!card) return res.status(404).json({ error: '卡片不存在' });
+  const next = suspended === undefined ? (card.suspended ? 0 : 1) : (suspended ? 1 : 0);
+  db.prepare('UPDATE cards SET suspended = ?, updated_at = ? WHERE id = ?').run(next, nowISO(), card.id);
+  res.json({ ok: true, cardId: card.id, suspended: next === 1 });
+});
+
+/** 搁置当前卡到明日(P1) */
+router.post('/bury', (req, res) => {
+  const { cardId } = req.body ?? {};
+  const card = db.prepare('SELECT id FROM cards WHERE id = ?').get(Number(cardId));
+  if (!card) return res.status(404).json({ error: '卡片不存在' });
+  db.prepare('UPDATE cards SET buried_until = ?, updated_at = ? WHERE id = ?').run(endOfTodayISO(), nowISO(), Number(cardId));
+  res.json({ ok: true, cardId: Number(cardId), buriedUntil: endOfTodayISO() });
 });
 
 export default router;

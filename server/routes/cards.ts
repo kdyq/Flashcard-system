@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { db, nowISO, subtreeDeckIds, type CardRow } from '../db';
 
 const router = Router();
@@ -32,22 +33,31 @@ function tagsOf(cardIds: number[]): Map<number, string[]> {
   return map;
 }
 
-function insertCard(input: any): CardRow {
+function insertCard(input: any): CardRow[] {
   const now = nowISO();
   const type = VALID_TYPES.includes(input.type) ? input.type : 'basic';
-  const info = db.prepare(`
+  const ins = db.prepare(`
     INSERT INTO cards(deck_id, note_id, type, front_md, back_md, due, state, tts, audio_url, audio_mode, created_at, updated_at)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(
-    input.deck_id, input.note_id ?? null, type,
-    String(input.front_md ?? ''), input.back_md ?? null,
-    now /* 新卡 due=创建时刻,立即可学 */, 'new',
-    input.tts ? 1 : 0, input.audio_url ?? null, input.audio_mode ?? null,
-    now, now
-  );
-  const id = Number(info.lastInsertRowid);
-  if (Array.isArray(input.tags)) syncTags(id, input.tags);
-  return db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow;
+  `);
+  const make = (deckId: number, noteId: string | null, type: string, front: string, back: string | null): number =>
+    Number(ins.run(deckId, noteId, type, front, back, now, 'new', input.tts ? 1 : 0, input.audio_url ?? null, input.audio_mode ?? null, now, now).lastInsertRowid);
+
+  let ids: number[] = [];
+  if (type === 'reversed') {
+    // 双向卡:同一 note 生成 正→反、反→正 两张,进度独立、内容联动
+    const noteId = input.note_id ?? crypto.randomUUID();
+    ids = [
+      make(input.deck_id, noteId, 'reversed', String(input.front_md ?? ''), input.back_md ?? null),
+      make(input.deck_id, noteId, 'reversed', input.back_md ?? '', String(input.front_md ?? '')),
+    ];
+  } else {
+    ids = [make(input.deck_id, input.note_id ?? null, type, String(input.front_md ?? ''), input.back_md ?? null)];
+  }
+  if (Array.isArray(input.tags)) {
+    for (const id of ids) syncTags(id, input.tags);
+  }
+  return ids.map(id => db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow);
 }
 
 /** 卡片列表 / 搜索 / 分页 */
@@ -101,7 +111,7 @@ router.post('/', (req, res) => {
   }
   const created: CardRow[] = [];
   const tx = db.transaction(() => {
-    for (const c of list) created.push(insertCard(c));
+    for (const c of list) created.push(...insertCard(c));
   });
   tx();
   res.status(201).json({ items: created, count: created.length });
@@ -124,22 +134,90 @@ router.patch('/:id', (req, res) => {
   if (b.deck_id !== undefined && !db.prepare('SELECT id FROM decks WHERE id = ?').get(b.deck_id)) {
     return res.status(400).json({ error: '目标卡组不存在' });
   }
-  db.prepare(`
-    UPDATE cards SET front_md = ?, back_md = ?, deck_id = ?, suspended = ?, tts = ?, audio_url = ?, audio_mode = ?, updated_at = ?
-    WHERE id = ?
-  `).run(
-    b.front_md !== undefined ? String(b.front_md) : card.front_md,
-    b.back_md !== undefined ? b.back_md : card.back_md,
-    b.deck_id !== undefined ? b.deck_id : card.deck_id,
-    b.suspended !== undefined ? (b.suspended ? 1 : 0) : card.suspended,
-    b.tts !== undefined ? (b.tts ? 1 : 0) : card.tts,
-    b.audio_url !== undefined ? b.audio_url : card.audio_url,
-    b.audio_mode !== undefined ? b.audio_mode : card.audio_mode,
-    nowISO(), id
-  );
+  const newFront = b.front_md !== undefined ? String(b.front_md) : card.front_md;
+  const newBack = b.back_md !== undefined ? b.back_md : card.back_md;
+  const newDeck = b.deck_id !== undefined ? b.deck_id : card.deck_id;
+
+  const apply = (row: CardRow, front: string, back: string | null, deckId: number) => {
+    db.prepare(`
+      UPDATE cards SET front_md = ?, back_md = ?, deck_id = ?, suspended = ?, tts = ?, audio_url = ?, audio_mode = ?, updated_at = ?
+      WHERE id = ?
+    `).run(front, back, deckId, row.suspended, row.tts, row.audio_url, row.audio_mode, nowISO(), row.id);
+  };
+  apply(card, newFront, newBack, newDeck);
+
+  // 双向卡:内容/卡组/标签联动到同 note 的另一张
+  const sibling = card.note_id
+    ? db.prepare('SELECT * FROM cards WHERE note_id = ? AND id != ?').get(card.note_id, id) as CardRow | undefined
+    : undefined;
+  if (sibling) {
+    apply(sibling, newBack ?? '', newFront, newDeck);
+    if (Array.isArray(b.tags)) syncTags(sibling.id, b.tags);
+  }
   if (Array.isArray(b.tags)) syncTags(id, b.tags);
   const updated = db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow;
-  res.json({ ...updated, tags: tagsOf([id]).get(id) ?? [] });
+  res.json({ ...updated, tags: tagsOf([id]).get(id) ?? [], siblingId: sibling?.id ?? null });
+});
+
+/** 重置进度:回到全新状态(P1) */
+router.post('/:id/reset', (req, res) => {
+  const id = Number(req.params.id);
+  const card = db.prepare('SELECT id FROM cards WHERE id = ?').get(id);
+  if (!card) return res.status(404).json({ error: '卡片不存在' });
+  db.prepare(`
+    UPDATE cards SET due = ?, stability = NULL, difficulty = NULL, state = 'new', reps = 0, lapses = 0,
+      last_review = NULL, elapsed_days = 0, scheduled_days = 0, learning_steps = 0,
+      suspended = 0, buried_until = NULL, updated_at = ? WHERE id = ?
+  `).run(nowISO(), nowISO(), id);
+  res.json({ ok: true, cardId: id });
+});
+
+/** 批量操作:移动/删除/加标签/移除标签/暂停/恢复/搁置/重置(P1) */
+router.post('/batch', (req, res) => {
+  const { ids, action, deckId, tag } = req.body ?? {};
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '没有选择卡片' });
+  const list = ids.map(Number).filter(n => Number.isInteger(n));
+  const ph = list.map(() => '?').join(',');
+  const byId = db.prepare('SELECT * FROM cards WHERE id = ?');
+  let affected = 0;
+  const tx = db.transaction(() => {
+    for (const id of list) {
+      const card = byId.get(id) as CardRow | undefined;
+      if (!card) continue;
+      switch (action) {
+        case 'delete':
+          db.prepare('DELETE FROM cards WHERE id = ?').run(id);
+          if (card.note_id) db.prepare('DELETE FROM cards WHERE note_id = ?').run(card.note_id); // 双向卡整对删除
+          affected++;
+          break;
+        case 'move':
+          if (!deckId) throw Object.assign(new Error('缺少目标卡组'), { status: 400 });
+          db.prepare('UPDATE cards SET deck_id = ?, updated_at = ? WHERE id = ?').run(deckId, nowISO(), id);
+          if (card.note_id) db.prepare('UPDATE cards SET deck_id = ?, updated_at = ? WHERE note_id = ?').run(deckId, nowISO(), card.note_id);
+          affected++;
+          break;
+        case 'tag':
+          if (!tag) throw Object.assign(new Error('缺少标签名'), { status: 400 });
+          db.prepare('INSERT INTO tags(name) VALUES(?) ON CONFLICT(name) DO NOTHING').run(tag);
+          const t = db.prepare('SELECT id FROM tags WHERE name = ?').get(tag) as { id: number } | undefined;
+          if (t) db.prepare('INSERT OR IGNORE INTO card_tags(card_id, tag_id) VALUES(?,?)').run(id, t.id);
+          affected++;
+          break;
+        case 'suspend':
+          db.prepare('UPDATE cards SET suspended = 1, updated_at = ? WHERE id = ?').run(nowISO(), id);
+          affected++;
+          break;
+        case 'unsuspend':
+          db.prepare('UPDATE cards SET suspended = 0, updated_at = ? WHERE id = ?').run(nowISO(), id);
+          affected++;
+          break;
+        default:
+          throw Object.assign(new Error(`未知批量操作 ${action}`), { status: 400 });
+      }
+    }
+  });
+  try { tx(); } catch (e: any) { return res.status(e.status || 500).json({ error: e.message }); }
+  res.json({ ok: true, action, affected });
 });
 
 router.delete('/:id', (req, res) => {

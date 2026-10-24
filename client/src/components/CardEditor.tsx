@@ -92,6 +92,16 @@ export default function CardEditor({ payload, onClose, onSaved }: {
 
   return (
     <Modal title={editing ? '编辑卡片' : '新建卡片'} onClose={onClose}>
+      {editing?.type === 'reversed' && (
+        <p style={{ fontSize: 12.5, color: 'var(--accent)', marginBottom: 10 }}>
+          双向卡:保存后「反→正」那张会同步更新(两张卡进度独立)。
+        </p>
+      )}
+      {type === 'cloze' && (
+        <p style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>
+          填空语法 {'{{c1::文字}}'},多个挖空用 c1/c2/c3,出题时轮换。
+        </p>
+      )}
       <div className="editor-toolbar">
         <button className="btn-ghost btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
           <ImageSquare size={15} /> {uploading ? '上传中…' : '插入图片'}
@@ -101,6 +111,9 @@ export default function CardEditor({ payload, onClose, onSaved }: {
         </button>
         <button className="btn-ghost btn-sm" onClick={() => insertAtCursor(frontRef.current, '\n$$\nx^2\n$$\n')}>
           <MathOperations size={15} /> LaTeX 块级
+        </button>
+        <button className="btn-ghost btn-sm" onClick={() => insertAtCursor(frontRef.current, '{{c1::被挖空的内容}}')} disabled={type !== 'cloze'}>
+          挖空模板
         </button>
         <button className="btn-ghost btn-sm" onClick={() => setShowPreview(v => !v)}>
           {showPreview ? '隐藏预览' : '显示预览'}
