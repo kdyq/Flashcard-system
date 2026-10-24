@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { gsap } from 'gsap';
-import { ArrowCounterClockwise, X, HandTap, CheckFat, ArrowLeft, Pause, PencilSimple, EyeSlash } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, X, HandTap, CheckFat, ArrowLeft, Pause, PencilSimple, EyeSlash, SpeakerHigh } from '@phosphor-icons/react';
 import { api } from '../api';
 import type { CardItem } from '../types';
 import MarkdownView from '../components/MarkdownView';
@@ -72,6 +72,24 @@ export default function Study() {
   /* 新卡入场 */
   useEffect(() => {
     if (loading || finished || !cur) return;
+    // P2:自动朗读正面 / 音频卡自动播放
+    if (cur.tts && 'speechSynthesis' in window) {
+      const plain = cur.front_md
+        .replace(/\{\{c\d+::([\s\S]*?)\}\}/g, '$1')
+        .replace(/[$`*_~#>[\]()!]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 300);
+      if (plain) {
+        const u = new SpeechSynthesisUtterance(plain);
+        u.lang = 'zh-CN';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      }
+    }
+    if (cur.audio_url && (cur.audio_mode === 'auto' || cur.audio_mode === 'question')) {
+      new Audio(cur.audio_url).play().catch(() => {});
+    }
     const ctx = gsap.context(() => {
       gsap.set(cardRef.current, { rotationY: 0, x: 0, rotation: 0, autoAlpha: 1, scale: 1, y: 0 });
       gsap.set(ratesRef.current, { autoAlpha: 0, y: 10 });
@@ -310,7 +328,16 @@ export default function Study() {
                     <MarkdownView md={flipped ? (cur.back_md ?? '(没有背面内容)') : cur.front_md} />
                   )}
                 </div>
-                {!flipped && (
+                {!flipped && cur.audio_url && cur.audio_mode === 'click' && (
+                  <div className="card-hint" style={{ cursor: 'pointer' }}
+                    onClick={e => { e.stopPropagation(); new Audio(cur.audio_url!).play().catch(() => {}); }}>
+                    <SpeakerHigh size={17} />点击播放音频
+                  </div>
+                )}
+                {!flipped && !cur.audio_url && (
+                  <div className="card-hint"><HandTap size={17} />点一下卡片,或按 <kbd>空格</kbd> 翻面</div>
+                )}
+                {!flipped && cur.audio_url && cur.audio_mode !== 'click' && (
                   <div className="card-hint"><HandTap size={17} />点一下卡片,或按 <kbd>空格</kbd> 翻面</div>
                 )}
               </>

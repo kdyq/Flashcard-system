@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { UPLOADS_DIR } from './db';
+import { backupOnce } from './backup';
 import decksRoutes from './routes/decks';
 import cardsRoutes from './routes/cards';
 import studyRoutes from './routes/study';
@@ -31,4 +32,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`[fanfan-server] listening on http://localhost:${PORT}`);
+  // 每日首次启动自动备份(静默失败不影响使用)
+  backupOnce().then(dest => { if (dest) console.log('[backup] 每日备份完成:', dest); }).catch(e => console.warn('[backup] 失败:', e.message));
 });

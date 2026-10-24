@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { D } from './utils/anim';
+import { api } from './api';
 import { ToastProvider } from './components/Toast';
 import NavBar from './components/NavBar';
 import Dashboard from './pages/Dashboard';
@@ -11,6 +12,7 @@ import Browse from './pages/Browse';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
 import AIStudio from './pages/AIStudio';
+import useReminder from './hooks/useReminder';
 
 /** 页面切换入场(与设计稿 switchView 一致) */
 function PageShell({ children }: { children: React.ReactNode }) {
@@ -33,6 +35,15 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const isStudy = location.pathname.startsWith('/study');
+  const [reminder, setReminder] = useState({ enabled: false, time: '20:00' });
+
+  useEffect(() => {
+    api.settings.get().then(s => setReminder({
+      enabled: Boolean(s.reminder_enabled),
+      time: String(s.reminder_time || '20:00'),
+    })).catch(() => {});
+  }, [location.pathname]);
+  useReminder(reminder.enabled, reminder.time);
 
   // Esc 退出学习页
   useEffect(() => {

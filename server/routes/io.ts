@@ -81,10 +81,16 @@ router.post('/import', upload.single('file'), (req: any, res: any) => {
 
   const trimmed = text.trim();
   if (trimmed.startsWith('{')) {
+    let parsed: unknown;
     try {
-      return importJSON(res, JSON.parse(trimmed), mode);
+      parsed = JSON.parse(trimmed);
     } catch {
       return res.status(400).json({ error: 'JSON 解析失败,文件格式不正确' });
+    }
+    try {
+      return importJSON(res, parsed as any, mode);
+    } catch (e: any) {
+      return res.status(500).json({ error: `JSON 导入失败:${e.message}` });
     }
   }
   return importCSV(res, trimmed, deckId);
@@ -172,7 +178,7 @@ function importJSON(res: any, data: any, mode: 'merge' | 'overwrite') {
       const insCard = db.prepare(`
         INSERT INTO cards(id,deck_id,note_id,type,front_md,back_md,due,stability,difficulty,state,reps,lapses,last_review,
           elapsed_days,scheduled_days,learning_steps,suspended,buried_until,tts,audio_url,audio_mode,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES(${Array.from({ length: 23 }, () => '?').join(',')})
       `);
       for (const c of data.cards ?? []) {
         insCard.run(c.id, c.deck_id, c.note_id ?? null, c.type ?? 'basic', c.front_md, c.back_md ?? null,
@@ -235,7 +241,7 @@ function importJSON(res: any, data: any, mode: 'merge' | 'overwrite') {
     const insCard = db.prepare(`
       INSERT INTO cards(deck_id,note_id,type,front_md,back_md,due,stability,difficulty,state,reps,lapses,last_review,
         elapsed_days,scheduled_days,learning_steps,suspended,buried_until,tts,audio_url,audio_mode,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES(${Array.from({ length: 22 }, () => '?').join(',')})
     `);
     const cardTagsByCard = new Map<number, any[]>();
     for (const ct of data.card_tags ?? []) {

@@ -59,6 +59,13 @@ export const api = {
   settings: {
     get: () => req<AppSettings>('GET', '/settings'),
     update: (patch: Record<string, unknown>) => req<{ ok: boolean }>('PUT', '/settings', patch),
+    optimize: (minLogs?: number) =>
+      req<{ ok: boolean; w: number[]; logs: number; cards: number; elapsedMs: number }>('POST', '/settings/optimize', { minLogs }),
+    resetFsrs: () => req<{ ok: boolean }>('POST', '/settings/reset-fsrs', {}),
+    backupCreate: () =>
+      req<{ ok: boolean; backups: { filename: string; size: number; createdAt: string }[] }>('POST', '/settings/backups/create', {}),
+    backupRestore: (filename: string) =>
+      req<{ ok: boolean; tables: Record<string, number> }>('POST', '/settings/backups/restore', { filename }),
   },
   media: {
     upload: async (file: File | Blob, filename?: string): Promise<{ url: string }> => {

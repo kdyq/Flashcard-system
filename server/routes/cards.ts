@@ -137,21 +137,25 @@ router.patch('/:id', (req, res) => {
   const newFront = b.front_md !== undefined ? String(b.front_md) : card.front_md;
   const newBack = b.back_md !== undefined ? b.back_md : card.back_md;
   const newDeck = b.deck_id !== undefined ? b.deck_id : card.deck_id;
+  const newTts = b.tts !== undefined ? (b.tts ? 1 : 0) : card.tts;
+  const newAudioUrl = b.audio_url !== undefined ? b.audio_url : card.audio_url;
+  const newAudioMode = b.audio_mode !== undefined ? b.audio_mode : card.audio_mode;
 
-  const apply = (row: CardRow, front: string, back: string | null, deckId: number) => {
+  const apply = (row: CardRow, front: string, back: string | null, deckId: number,
+                 tts: number, audioUrl: string | null, audioMode: string | null) => {
     db.prepare(`
-      UPDATE cards SET front_md = ?, back_md = ?, deck_id = ?, suspended = ?, tts = ?, audio_url = ?, audio_mode = ?, updated_at = ?
+      UPDATE cards SET front_md = ?, back_md = ?, deck_id = ?, tts = ?, audio_url = ?, audio_mode = ?, updated_at = ?
       WHERE id = ?
-    `).run(front, back, deckId, row.suspended, row.tts, row.audio_url, row.audio_mode, nowISO(), row.id);
+    `).run(front, back, deckId, tts, audioUrl, audioMode, nowISO(), row.id);
   };
-  apply(card, newFront, newBack, newDeck);
+  apply(card, newFront, newBack, newDeck, newTts, newAudioUrl, newAudioMode);
 
-  // 双向卡:内容/卡组/标签联动到同 note 的另一张
+  // 双向卡:内容/卡组/标签联动到同 note 的另一张(暂停状态各自独立)
   const sibling = card.note_id
     ? db.prepare('SELECT * FROM cards WHERE note_id = ? AND id != ?').get(card.note_id, id) as CardRow | undefined
     : undefined;
   if (sibling) {
-    apply(sibling, newBack ?? '', newFront, newDeck);
+    apply(sibling, newBack ?? '', newFront, newDeck, sibling.tts, sibling.audio_url, sibling.audio_mode);
     if (Array.isArray(b.tags)) syncTags(sibling.id, b.tags);
   }
   if (Array.isArray(b.tags)) syncTags(id, b.tags);

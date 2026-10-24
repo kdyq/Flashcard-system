@@ -17,6 +17,23 @@ export default function Stats() {
 
   const maxF = useMemo(() => Math.max(1, ...forecast.map(f => f.count)), [forecast]);
 
+  // 本月打卡日历(数据取自热力图)
+  const now = new Date();
+  const todayKey = now.toLocaleDateString('sv-SE');
+  const monthPrefix = todayKey.slice(0, 7);
+  const heatMap = useMemo(() => new Map((heat ?? []).map(d => [d.date, d])), [heat]);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthLead = (new Date(now.getFullYear(), now.getMonth(), 1).getDay() + 6) % 7; // 周一=0
+  const levelColors = ['#efece4', '#f3cdc3', '#e9968a', '#d94f3d', '#a93123'];
+  const monthDays = Array.from({ length: daysInMonth }, (_, k) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), k + 1);
+    const key = `${monthPrefix}-${String(k + 1).padStart(2, '0')}`;
+    const count = heatMap.get(key)?.count ?? 0;
+    const level = count === 0 ? 0 : count < 5 ? 1 : count < 15 ? 2 : count < 30 ? 3 : 4;
+    return { key, count, level, levelColor: levelColors[level], future: d > now };
+  });
+  const monthTotal = monthDays.reduce((s2, d) => s2 + d.count, 0);
+
   return (
     <div>
       <div className="panel-title" style={{ marginBottom: 20 }}>
@@ -48,6 +65,29 @@ export default function Stats() {
           <i key={c} style={{ ...cell, background: c }} />
         ))}
         <span>多</span>
+      </div>
+
+      <div className="panel-title" style={{ marginTop: 26 }}><h3>本月打卡</h3>
+        <span>{now.getFullYear()} 年 {now.getMonth() + 1} 月 · 本月已学 {monthTotal} 次</span>
+      </div>
+      <div className="panel" style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 34px)', gap: 6 }}>
+          {['一', '二', '三', '四', '五', '六', '日'].map(w => (
+            <div key={w} style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', fontWeight: 600 }}>{w}</div>
+          ))}
+          {Array.from({ length: monthLead }, (_, k) => <div key={`pad-${k}`} />)}
+          {monthDays.map(d => (
+            <div key={d.key} title={`${d.key}:${d.count} 次复习`}
+              style={{
+                width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center',
+                fontSize: 12.5, fontWeight: 600,
+                background: d.future ? '#f4f2ec' : d.levelColor,
+                color: d.level >= 2 ? '#fff' : 'var(--ink-2)',
+                outline: d.key === todayKey ? '2.5px solid var(--accent)' : 'none',
+                outlineOffset: 1.5,
+              }}>{Number(d.key.slice(-2))}</div>
+          ))}
+        </div>
       </div>
 
       <div className="panel-title" style={{ marginTop: 26 }}><h3>未来负荷</h3><span>未来 30 天每日到期卡片数</span></div>

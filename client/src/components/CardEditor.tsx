@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
-import { ImageSquare, MathOperations } from '@phosphor-icons/react';
+import { ImageSquare, MathOperations, SpeakerHigh, TrashSimple } from '@phosphor-icons/react';
 import { api } from '../api';
 import type { CardItem, CardType, DeckNode, TagItem } from '../types';
 import Modal from './Modal';
@@ -27,7 +27,11 @@ export default function CardEditor({ payload, onClose, onSaved }: {
   const [showPreview, setShowPreview] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [tts, setTts] = useState(Boolean(editing?.tts));
+  const [audioUrl, setAudioUrl] = useState<string | null>(editing?.audio_url ?? null);
+  const [audioMode, setAudioMode] = useState<string>(editing?.audio_mode ?? '');
   const fileRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -79,7 +83,10 @@ export default function CardEditor({ payload, onClose, onSaved }: {
   async function save() {
     if (!front.trim()) { toast('正面内容不能为空'); return; }
     if (!deckId) { toast('请选择卡组'); return; }
-    const body = { deck_id: deckId, type, front_md: front, back_md: back || null, tags };
+    const body = {
+      deck_id: deckId, type, front_md: front, back_md: back || null, tags,
+      tts: tts ? 1 : 0, audio_url: audioUrl || null, audio_mode: audioMode || null,
+    };
     try {
       if (editing) await api.cards.update(editing.id, body);
       else await api.cards.create(body);
@@ -151,7 +158,49 @@ export default function CardEditor({ payload, onClose, onSaved }: {
         </div>
       )}
 
-      <div className={`editor-grid ${showPreview ? '' : 'single'}`} style={showPreview ? undefined : { gridTemplateColumns: '1fr' }}>
+      {/* 音频与朗读(P2) */}
+      <div className="panel" style={{ padding: 14, marginBottom: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ minWidth: 170 }}>
+          <label className="field">音频</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className="btn-ghost btn-sm" onClick={() => audioRef.current?.click()}>
+              <SpeakerHigh size={14} />{audioUrl ? '更换音频' : '上传音频'}
+            </button>
+            {audioUrl && (
+              <>
+                <button className="icon-btn" style={{ width: 28, height: 28 }} title="移除音频"
+                  onClick={() => { setAudioUrl(null); setAudioMode(''); }}><TrashSimple size={13} /></button>
+                <audio src={audioUrl} controls style={{ height: 30, maxWidth: 190 }} />
+              </>
+            )}
+            <input ref={audioRef} type="file" accept="audio/*" hidden
+              onChange={e => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (!f) return;
+                setUploading(true);
+                api.media.upload(f).then(r => { setAudioUrl(r.url); setAudioMode(m => m || 'click'); toast('音频已上传'); })
+                  .catch(err => toast(err.message)).finally(() => setUploading(false));
+              }} />
+          </div>
+        </div>
+        {audioUrl && (
+          <div style={{ minWidth: 150 }}>
+            <label className="field">播放方式</label>
+            <select value={audioMode} onChange={e => setAudioMode(e.target.value)}>
+              <option value="click">点击播放</option>
+              <option value="auto">自动播放</option>
+              <option value="question">作为问题(自动)</option>
+            </select>
+          </div>
+        )}
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, cursor: 'pointer', paddingBottom: 8 }}>
+          <input type="checkbox" checked={tts} onChange={e => setTts(e.target.checked)} style={{ width: 'auto' }} />
+          自动朗读正面(浏览器 TTS)
+        </label>
+      </div>
+
+      <div className="editor-grid" style={showPreview ? undefined : { gridTemplateColumns: '1fr' }}>
         <div className="editor-pane"
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}

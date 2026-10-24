@@ -56,5 +56,7 @@ export interface AppSettings {
   ai_base_url: string; ai_model: string; ai_enabled: boolean;
   ai_key_present: boolean; ai_key_source: 'settings' | 'env' | 'none';
   reminder_enabled: boolean; reminder_time: string; backup_keep: number;
+  _logsCount?: number;
+  _backups?: { filename: string; size: number; createdAt: string }[];
   [k: string]: unknown;
 }
