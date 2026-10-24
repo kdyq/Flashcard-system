@@ -67,6 +67,13 @@ export const api = {
     backupRestore: (filename: string) =>
       req<{ ok: boolean; tables: Record<string, number> }>('POST', '/settings/backups/restore', { filename }),
   },
+  ai: {
+    test: (baseUrl?: string, model?: string, apiKey?: string) =>
+      req<{ ok: boolean; model: string; latencyMs: number; reply: string; keySource: string }>('POST', '/ai/test', { baseUrl, model, apiKey }),
+    generate: (text: string, count: number, deckId?: number) =>
+      req<{ ok: boolean; cards: { front: string; back: string; tags: string[]; type: string }[]; latencyMs: number; model: string }>(
+        'POST', '/ai/generate', { text, count, deckId }),
+  },
   media: {
     upload: async (file: File | Blob, filename?: string): Promise<{ url: string }> => {
       const fd = new FormData();

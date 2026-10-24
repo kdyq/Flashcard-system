@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DownloadSimple, UploadSimple, ArrowClockwise } from '@phosphor-icons/react';
+import { DownloadSimple, UploadSimple, ArrowClockwise, Lightning } from '@phosphor-icons/react';
 import { api } from '../api';
 import type { AppSettings } from '../types';
 import Modal from '../components/Modal';
@@ -22,6 +22,12 @@ export default function Settings() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('20:00');
   const [backupKeep, setBackupKeep] = useState(7);
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiKey, setAiKey] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => api.settings.get().then(r => {
@@ -31,6 +37,9 @@ export default function Settings() {
     setReminderEnabled(Boolean(r.reminder_enabled));
     setReminderTime(String(r.reminder_time || '20:00'));
     setBackupKeep(Number(r.backup_keep ?? 7));
+    setAiBaseUrl(String(r.ai_base_url || ''));
+    setAiModel(String(r.ai_model || ''));
+    setAiEnabled(Boolean(r.ai_enabled));
   }).catch(e => toast(e.message));
   useEffect(() => { refresh(); }, []); // eslint-disable-line
 
@@ -194,6 +203,60 @@ export default function Settings() {
               onBlur={async () => { try { await api.settings.update({ reminder_time: reminderTime }); toast('已保存'); } catch (err: any) { toast(err.message); } }} />
           </div>
         </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-title"><h3>AI 卡片生成(P3)</h3>
+          <span>{s ? (s.ai_key_source === 'settings' ? 'Key:设置页' : s.ai_key_source === 'env' ? 'Key:本地 .env' : 'Key:未配置') : ''}</span>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+          任意 OpenAI 协议兼容服务均可。API Key 只存本地 SQLite 并经后端转发,浏览器不直连、不落前端日志。
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            <label className="field">Base URL</label>
+            <input type="url" value={aiBaseUrl} onChange={e => setAiBaseUrl(e.target.value)} placeholder="https://api.agnes-ai.cn/v1" />
+          </div>
+          <div>
+            <label className="field">模型</label>
+            <input type="text" value={aiModel} onChange={e => setAiModel(e.target.value)} placeholder="agnes-3.0-flash" />
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label className="field">API Key{s?.ai_key_present ? '(已配置,留空则不修改)' : ''}</label>
+          <input type="password" value={aiKey} onChange={e => setAiKey(e.target.value)}
+            placeholder={s?.ai_key_present ? '••••••(不回显)' : 'sk-…'} autoComplete="new-password" />
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13.5, cursor: 'pointer' }}>
+            <input type="checkbox" checked={aiEnabled} style={{ width: 'auto' }}
+              onChange={e => setAiEnabled(e.target.checked)} />
+            启用 AI 功能
+          </label>
+          <button className="btn-ghost btn-sm" disabled={aiTesting} onClick={async () => {
+            setAiTesting(true); setAiTestResult(null);
+            try {
+              const r = await api.ai.test(aiBaseUrl, aiModel, aiKey || undefined);
+              setAiTestResult(`连接成功:${r.model},${r.latencyMs}ms,Key 来源 ${r.keySource}`);
+            } catch (e: any) {
+              setAiTestResult(`连接失败:${e.message}`);
+            }
+            setAiTesting(false);
+          }}><Lightning size={13} />{aiTesting ? '测试中…' : '测试连接'}</button>
+          <button className="btn-flip btn-sm" style={{ padding: '8px 18px' }} onClick={async () => {
+            try {
+              const patch: Record<string, unknown> = { ai_base_url: aiBaseUrl, ai_model: aiModel, ai_enabled: aiEnabled };
+              if (aiKey.trim()) patch.ai_api_key = aiKey.trim();
+              await api.settings.update(patch);
+              setAiKey('');
+              toast('AI 配置已保存');
+              refresh();
+            } catch (e: any) { toast(e.message); }
+          }}>保存配置</button>
+        </div>
+        {aiTestResult && (
+          <p style={{ marginTop: 10, fontSize: 13, color: aiTestResult.includes('成功') ? 'var(--accent)' : '#b42318' }}>{aiTestResult}</p>
+        )}
       </div>
 
       {s && (
