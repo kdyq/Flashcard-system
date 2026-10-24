@@ -126,6 +126,7 @@ router.post('/review', (req, res) => {
 
   const dueDate = new Date(patch.due);
   const { newDone, reviewDone } = todayCounts();
+  const updatedRow = db.prepare('SELECT * FROM cards WHERE id = ?').get(card.id) as CardRow;
   res.json({
     logId,
     cardId: card.id,
@@ -133,6 +134,7 @@ router.post('/review', (req, res) => {
     interval: formatInterval(dueDate, now),
     due: patch.due,
     requeueToday: (patch.state === 'learning' || patch.state === 'relearning') && dueDate <= new Date(endOfTodayISO()),
+    previews: previewIntervals(updatedRow, new Date(Math.max(Date.now(), dueDate.getTime()))),
     today: { newDone, reviewDone },
   });
 });
