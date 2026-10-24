@@ -1,0 +1,14 @@
+{
+  "name": "fanfan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "翻翻 FanFan · 本地间隔重复闪卡系统",
+  "scripts": {
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix client run build",
+    "start": "concurrently \"npm --prefix server start\" \"npm --prefix client run preview\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
